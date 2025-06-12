@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Car Racing Game</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>3D Car Racing Game</h1>
+            <div class="game-stats">
+                <div class="score">Score: <span id="score">0</span></div>
+                <div class="speed">Speed: <span id="speed">0</span> kmph</div>
+                <div class="lives">Lives: <span id="lives">3</span></div>
+            </div>
+        </div>
+        
+        <div class="game-area" id="gameArea">
+            <canvas id="gameCanvas"></canvas>
+            
+            <div class="game-over" id="gameOver" style="display: none;">
+                <h2>Game Over!</h2>
+                <p>Final Score: <span id="finalScore">0</span></p>
+                <p>Press SPACE to play again</p>
+                <button onclick="restartGame()">Play Again</button>
+            </div>
+            
+            <div class="start-screen" id="startScreen">
+                <h2>3D Car Racing Game</h2>
+                <p>Use arrow keys or WASD to control your car</p>
+                <p>Avoid obstacles and collect power-ups!</p>
+                <p>Experience realistic 3D racing!</p>
+                <p>Press ENTER or click to start</p>
+                <button onclick="startGame()">Start Game</button>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <p>Controls: Use ← → arrow keys or A D keys to steer</p>
+            <p>Use ↑ ↓ arrow keys or W S keys to accelerate/brake</p>
+            <p>SPACE: Restart game | ENTER: Start game</p>
+            <p>Touch: Swipe left/right to steer, up/down to accelerate/brake</p>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
