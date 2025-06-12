@@ -1,3 +1,24 @@
+// Global Error Handler
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error("Global error caught:", {
+        message: message,
+        source: source,
+        lineno: lineno,
+        colno: colno,
+        errorObject: error
+    });
+    const errorDisplay = document.getElementById('criticalErrorDisplay');
+    if (errorDisplay) {
+        errorDisplay.textContent = "An unexpected error occurred. Please try refreshing the page. Check console for details.";
+        errorDisplay.style.display = 'block';
+    }
+    // Consider stopping the game loop or other critical operations here if needed
+    if (typeof gameRunning !== 'undefined') {
+        gameRunning = false; // Attempt to stop the game loop
+    }
+    return true; // Prevent default browser error handling
+};
+
 // 3D Game variables
 let scene, camera, renderer, gameRunning = false;
 let gameSpeed = 0.04, score = 0, lives = 3;
@@ -25,33 +46,34 @@ const ROAD_LENGTH = 100;
 
 // Initialize 3D scene
 function init3D() {
-    // Create scene
-    scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x000044, 0.015);
+    try {
+        // Create scene
+        scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000044, 0.015); // Adds a fog effect for atmosphere
     
     // Create camera
-    camera = new THREE.PerspectiveCamera(75, 800/600, 0.1, 1000);
-    camera.position.set(0, 4, 6);
-    camera.lookAt(0, 0, -10);
+    camera = new THREE.PerspectiveCamera(75, 800/600, 0.1, 1000); // Field of view, aspect ratio, near clip, far clip
+    camera.position.set(0, 4, 6); // Positioned above and behind the car
+    camera.lookAt(0, 0, -10); // Looking down the road
     
     // Create renderer with enhanced settings
     renderer = new THREE.WebGLRenderer({ 
-        canvas: canvas, 
-        antialias: true,
-        alpha: true,
-        powerPreference: "high-performance"
+        canvas: canvas, // Target canvas element
+        antialias: true, // Smooths edges
+        alpha: true, // Allows transparency for effects
+        powerPreference: "high-performance" // Prioritizes performance
     });
-    renderer.setSize(800, 600);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0x000044, 1);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputEncoding = THREE.sRGBEncoding;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.setSize(800, 600); // Initial size, will be updated on resize
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Optimizes for high DPI screens
+    renderer.setClearColor(0x000044, 1); // Dark blue background color, matching fog
+    renderer.shadowMap.enabled = true; // Enables shadows
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadow edges
+    renderer.outputEncoding = THREE.sRGBEncoding; // Correct color output
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; // Advanced tone mapping for HDR-like effect
+    renderer.toneMappingExposure = 1.2; // Adjusts overall brightness
     
     // Add lights
-    setupLighting();
+    setupLighting(); // Configures various light sources
     
     // Create road
     createRoad();
@@ -59,21 +81,33 @@ function init3D() {
     // Create player car
     createPlayerCar();
     
-    // Add environment
-    createEnvironment();
+        // Add environment
+        createEnvironment();
+    } catch (e) {
+        console.error("Error during 3D initialization (init3D):", e);
+        const errorDisplay = document.getElementById('criticalErrorDisplay');
+        if (errorDisplay) {
+            errorDisplay.textContent = "Failed to initialize the 3D scene. Please ensure your browser supports WebGL and try refreshing.";
+            errorDisplay.style.display = 'block';
+        }
+        // Game cannot run if init3D fails
+        gameRunning = false;
+        throw e; // Re-throw if you want it to be caught by the global handler or for other reasons
+    }
 }
 
 // Setup lighting
 function setupLighting() {
-    // Ambient light - reduced intensity
-    const ambientLight = new THREE.AmbientLight(0x404080, 0.25);
+    // Ambient light - provides overall, non-directional illumination
+    const ambientLight = new THREE.AmbientLight(0x404080, 0.25); // Soft blue-ish white, low intensity
     scene.add(ambientLight);
     
-    // Directional light (sun/moon) - reduced intensity
-    const directionalLight = new THREE.DirectionalLight(0x8888ff, 0.9);
-    directionalLight.position.set(15, 25, 10);
+    // Directional light (simulates sun/moon) - provides main directional lighting and casts shadows
+    const directionalLight = new THREE.DirectionalLight(0x8888ff, 0.9); // Cool white, fairly bright
+    directionalLight.position.set(15, 25, 10); // Positioned to cast shadows from an angle
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 4096;
+    // Shadow map settings for quality
+    directionalLight.shadow.mapSize.width = 4096; // High resolution for sharp shadows
     directionalLight.shadow.mapSize.height = 4096;
     directionalLight.shadow.camera.near = 0.5;
     directionalLight.shadow.camera.far = 100;
@@ -81,19 +115,19 @@ function setupLighting() {
     directionalLight.shadow.camera.right = 30;
     directionalLight.shadow.camera.top = 30;
     directionalLight.shadow.camera.bottom = -30;
-    directionalLight.shadow.bias = -0.0001;
+    directionalLight.shadow.bias = -0.0001; // Helps prevent shadow acne
     scene.add(directionalLight);
     
-    // Rim lighting - reduced intensity
-    const rimLight = new THREE.DirectionalLight(0x4444ff, 0.4);
-    rimLight.position.set(-10, 5, -10);
+    // Rim lighting - adds highlights to edges of objects, enhancing 3D feel
+    const rimLight = new THREE.DirectionalLight(0x4444ff, 0.4); // Blueish, subtle intensity
+    rimLight.position.set(-10, 5, -10); // Positioned opposite to the main light
     scene.add(rimLight);
     
-    // Point lights for car headlights - reduced intensity
-    const headlight1 = new THREE.PointLight(0xffffcc, 1.0, 15, 2);
-    headlight1.position.set(-0.3, 0.5, 2);
-    headlight1.castShadow = true;
-    headlight1.shadow.mapSize.width = 1024;
+    // Point lights for player car headlights - these will be updated to follow the car
+    const headlight1 = new THREE.PointLight(0xffffcc, 1.0, 15, 2); // Warm white, intensity, distance, decay
+    headlight1.position.set(-0.3, 0.5, 2); // Initial position relative to car
+    headlight1.castShadow = true; // Can cast shadows (though might be performance intensive)
+    headlight1.shadow.mapSize.width = 1024; // Lower res for performance
     headlight1.shadow.mapSize.height = 1024;
     scene.add(headlight1);
     
@@ -104,11 +138,11 @@ function setupLighting() {
     headlight2.shadow.mapSize.height = 1024;
     scene.add(headlight2);
     
-    // Store references for dynamic updates
+    // Store references for dynamic updates in updateLighting()
     scene.userData.headlights = [headlight1, headlight2];
     
-    // Street lights
-    createStreetLights();
+    // Street lights - static lights along the road
+    createStreetLights(); // Calls function to populate street lights
 }
 
 // Create street lights
@@ -166,172 +200,176 @@ function createStreetLights() {
 
 // Create road
 function createRoad() {
-    road = new THREE.Group();
+    road = new THREE.Group(); // Main group for all road elements
     
     // Main road surface with enhanced appearance
-    const roadGeometry = new THREE.PlaneGeometry(ROAD_WIDTH, ROAD_LENGTH, 64, 64);
+    const roadGeometry = new THREE.PlaneGeometry(ROAD_WIDTH, ROAD_LENGTH, 64, 64); // Width, length, segments for detail
     const roadMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0x1a1a1a,
-        shininess: 5,
-        specular: 0x111111,
+        color: 0x1a1a1a, // Dark asphalt color
+        shininess: 5, // Low shininess for a matte look
+        specular: 0x111111, // Subtle specular highlights
         transparent: false
     });
     
     // Create realistic road texture with height variations
     const roadMesh = new THREE.Mesh(roadGeometry, roadMaterial);
     const vertices = roadMesh.geometry.attributes.position.array;
+    // Add subtle asphalt texture variations by randomly adjusting vertex heights
     for (let i = 0; i < vertices.length; i += 3) {
-        // Add subtle asphalt texture variations
-        vertices[i + 2] += (Math.random() - 0.5) * 0.015;
+        vertices[i + 2] += (Math.random() - 0.5) * 0.015; // Small random offset on Z-axis (height)
     }
-    roadMesh.geometry.attributes.position.needsUpdate = true;
-    roadMesh.geometry.computeVertexNormals();
+    roadMesh.geometry.attributes.position.needsUpdate = true; // Required after modifying vertices
+    roadMesh.geometry.computeVertexNormals(); // Recalculate normals for correct lighting
     
-    roadMesh.rotation.x = -Math.PI / 2;
-    roadMesh.position.y = 0;
-    roadMesh.receiveShadow = false;
+    roadMesh.rotation.x = -Math.PI / 2; // Rotate to lay flat
+    roadMesh.position.y = 0; // Position at ground level
+    roadMesh.receiveShadow = false; // Main road surface doesn't need to receive shadows from itself
     road.add(roadMesh);
     
-    // Add road base/foundation
+    // Add road base/foundation for thickness
     createRoadBase();
     
-    // Enhanced road markings
+    // Enhanced road markings (lines, arrows)
     createRoadMarkings();
     
-    // Add road edge details
+    // Add road edge details (curbs)
     createRoadEdges();
+
+    // Add road studs (cat's eyes) for detail - Call this function if it's defined and desired
+    createRoadStuds(); 
     
-    scene.add(road);
+    scene.add(road); // Add the entire road group to the scene
 }
 
 // Create road base/foundation
 function createRoadBase() {
+    // A slightly wider plane beneath the main road surface to give it some thickness/depth
     const baseGeometry = new THREE.PlaneGeometry(ROAD_WIDTH + 1, ROAD_LENGTH, 32, 32);
     const baseMaterial = new THREE.MeshLambertMaterial({ 
-        color: 0x0d0d0d,
+        color: 0x0d0d0d, // Very dark grey, almost black
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8 // Slightly transparent
     });
     
     const baseMesh = new THREE.Mesh(baseGeometry, baseMaterial);
-    baseMesh.rotation.x = -Math.PI / 2;
-    baseMesh.position.y = -0.02;
-    road.add(baseMesh);
+    baseMesh.rotation.x = -Math.PI / 2; // Rotate to lay flat
+    baseMesh.position.y = -0.02; // Position slightly below the main road surface
+    road.add(baseMesh); // Add to the road group
 }
 
 // Create enhanced road markings
 function createRoadMarkings() {
     // Center lane divider - dashed lines
-    const centerLineGeometry = new THREE.BoxGeometry(0.2, 0.04, 3);
+    const centerLineGeometry = new THREE.BoxGeometry(0.2, 0.04, 3); // Width, height, length of each dash
     const centerLineMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffff
+        color: 0xffffff // White color
     });
     
-    for (let i = -ROAD_LENGTH/2; i < ROAD_LENGTH/2; i += 5) {
+    for (let i = -ROAD_LENGTH/2; i < ROAD_LENGTH/2; i += 5) { // Create dashes along the road length
         const centerLine = new THREE.Mesh(centerLineGeometry, centerLineMaterial);
-        centerLine.position.set(0, 0.02, i);
-        roadSegments.push(centerLine);
+        centerLine.position.set(0, 0.02, i); // Position slightly above the road surface
+        roadSegments.push(centerLine); // Store for animation in updateRoad()
         road.add(centerLine);
         
-        // Add subtle glow effect - reduced opacity
-        const glowGeometry = new THREE.BoxGeometry(0.35, 0.01, 3.5);
+        // Add subtle glow effect beneath the lines for better visibility
+        const glowGeometry = new THREE.BoxGeometry(0.35, 0.01, 3.5); // Slightly larger and thinner
         const glowMaterial = new THREE.MeshBasicMaterial({ 
             color: 0xffffff,
             transparent: true,
-            opacity: 0.1
+            opacity: 0.1 // Very subtle glow
         });
         const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-        glow.position.set(0, 0.025, i);
+        glow.position.set(0, 0.025, i); // Position slightly above the line
         road.add(glow);
     }
     
     // Side lane markings - solid lines
-    const sideLineGeometry = new THREE.BoxGeometry(0.25, 0.04, ROAD_LENGTH);
+    const sideLineGeometry = new THREE.BoxGeometry(0.25, 0.04, ROAD_LENGTH); // Full length of the road
     const sideLineMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffff00
+        color: 0xffff00 // Yellow color for side lines
     });
     
     // Left side line
     const leftLine = new THREE.Mesh(sideLineGeometry, sideLineMaterial);
-    leftLine.position.set(-ROAD_WIDTH/2 + 0.3, 0.02, 0);
+    leftLine.position.set(-ROAD_WIDTH/2 + 0.3, 0.02, 0); // Position at the left edge of the road
     road.add(leftLine);
     
     // Right side line
     const rightLine = new THREE.Mesh(sideLineGeometry, sideLineMaterial);
-    rightLine.position.set(ROAD_WIDTH/2 - 0.3, 0.02, 0);
+    rightLine.position.set(ROAD_WIDTH/2 - 0.3, 0.02, 0); // Position at the right edge of the road
     road.add(rightLine);
     
-    // Add lane change arrows
+    // Add lane change arrows for visual detail
     createLaneArrows();
 }
 
 // Create lane arrows
 function createLaneArrows() {
-    const arrowGeometry = new THREE.ConeGeometry(0.3, 1, 6);
+    const arrowGeometry = new THREE.ConeGeometry(0.3, 1, 6); // Radius, height, segments for arrow shape
     const arrowMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffff,
+        color: 0xffffff, // White color
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8 // Slightly transparent
     });
     
-    for (let i = -ROAD_LENGTH/2; i < ROAD_LENGTH/2; i += 20) {
+    for (let i = -ROAD_LENGTH/2; i < ROAD_LENGTH/2; i += 20) { // Place arrows periodically
         // Left lane arrow
         const leftArrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
-        leftArrow.position.set(-ROAD_WIDTH/4, 0.03, i);
-        leftArrow.rotation.x = -Math.PI / 2;
+        leftArrow.position.set(-ROAD_WIDTH/4, 0.03, i); // Position in the left lane
+        leftArrow.rotation.x = -Math.PI / 2; // Rotate to point along the road
         road.add(leftArrow);
         
         // Right lane arrow
         const rightArrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
-        rightArrow.position.set(ROAD_WIDTH/4, 0.03, i);
-        rightArrow.rotation.x = -Math.PI / 2;
+        rightArrow.position.set(ROAD_WIDTH/4, 0.03, i); // Position in the right lane
+        rightArrow.rotation.x = -Math.PI / 2; // Rotate to point along the road
         road.add(rightArrow);
     }
 }
 
-// Create road edges
+// Create road edges (curbs)
 function createRoadEdges() {
-    // Road shoulder/curb
-    const curbGeometry = new THREE.BoxGeometry(0.4, 0.1, ROAD_LENGTH);
+    // Road shoulder/curb geometry
+    const curbGeometry = new THREE.BoxGeometry(0.4, 0.1, ROAD_LENGTH); // Width, height, length of the curb
     const curbMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0x666666,
-        shininess: 30
+        color: 0x666666, // Grey color for curbs
+        shininess: 30 // Some shininess
     });
     
     // Left curb
     const leftCurb = new THREE.Mesh(curbGeometry, curbMaterial);
-    leftCurb.position.set(-ROAD_WIDTH/2 - 0.2, 0.05, 0);
-    leftCurb.castShadow = true;
+    leftCurb.position.set(-ROAD_WIDTH/2 - 0.2, 0.05, 0); // Position just outside the road width
+    leftCurb.castShadow = true; // Curbs can cast shadows
     road.add(leftCurb);
     
     // Right curb
     const rightCurb = new THREE.Mesh(curbGeometry, curbMaterial);
-    rightCurb.position.set(ROAD_WIDTH/2 + 0.2, 0.05, 0);
-    rightCurb.castShadow = true;
+    rightCurb.position.set(ROAD_WIDTH/2 + 0.2, 0.05, 0); // Position just outside the road width
+    rightCurb.castShadow = true; // Curbs can cast shadows
     road.add(rightCurb);
 }
 
-// Create road studs (cat's eyes)
+// Create road studs (cat's eyes) for visual detail and night driving feel
 function createRoadStuds() {
-    const studGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+    const studGeometry = new THREE.SphereGeometry(0.08, 8, 8); // Small spheres for studs
     const studMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0xffffff,
-        emissive: 0xffffff,
-        emissiveIntensity: 0.1,
-        shininess: 200,
+        color: 0xffffff, // White color
+        emissive: 0xffffff, // Emissive to make them glow slightly
+        emissiveIntensity: 0.1, // Low intensity glow
+        shininess: 200, // Highly shiny
         transparent: true,
         opacity: 0.9
     });
     
-    for (let i = -ROAD_LENGTH/2; i < ROAD_LENGTH/2; i += 10) {
-        // Center studs
+    for (let i = -ROAD_LENGTH/2; i < ROAD_LENGTH/2; i += 10) { // Place studs periodically
+        // Center studs (between dashed lines)
         const centerStud = new THREE.Mesh(studGeometry, studMaterial);
-        centerStud.position.set(0, 0.04, i + 2.5);
+        centerStud.position.set(0, 0.04, i + 2.5); // Position slightly above road, offset to be between dashes
         road.add(centerStud);
         
-        // Side studs with different colors
+        // Side studs with different colors (e.g., red for edges)
         const sideStudMaterial = new THREE.MeshPhongMaterial({ 
-            color: 0xff4444,
+            color: 0xff4444, // Red color for side studs
             emissive: 0xff4444,
             emissiveIntensity: 0.05,
             shininess: 200,
@@ -340,95 +378,95 @@ function createRoadStuds() {
         });
         
         const leftStud = new THREE.Mesh(studGeometry, sideStudMaterial);
-        leftStud.position.set(-ROAD_WIDTH/2 + 0.3, 0.04, i);
+        leftStud.position.set(-ROAD_WIDTH/2 + 0.3, 0.04, i); // Position near the left side line
         road.add(leftStud);
         
         const rightStud = new THREE.Mesh(studGeometry, sideStudMaterial);
-        rightStud.position.set(ROAD_WIDTH/2 - 0.3, 0.04, i);
+        rightStud.position.set(ROAD_WIDTH/2 - 0.3, 0.04, i); // Position near the right side line
         road.add(rightStud);
     }
 }
 
 // Create player car
 function createPlayerCar() {
-    playerCar = new THREE.Group();
+    playerCar = new THREE.Group(); // Main group for the player's car
     
     // Enhanced car body with metallic finish
-    const bodyGeometry = new THREE.BoxGeometry(1.2, 0.5, 2.5);
+    const bodyGeometry = new THREE.BoxGeometry(1.2, 0.5, 2.5); // Dimensions of the car body
     const bodyMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0xff2222,
-        shininess: 150,
-        specular: 0x888888,
-        reflectivity: 0.3
+        color: 0xff2222, // Red color for the player car
+        shininess: 150, // High shininess for a metallic look
+        specular: 0x888888, // Specular highlights
+        reflectivity: 0.3 // How much the environment reflects
     });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.y = 0.25;
-    body.castShadow = true;
-    body.receiveShadow = true;
+    body.position.y = 0.25; // Raise the body slightly off the ground
+    body.castShadow = true; // Player car casts shadows
+    body.receiveShadow = true; // And receives shadows
     playerCar.add(body);
     
     // Car roof with gradient effect
-    const roofGeometry = new THREE.BoxGeometry(1, 0.4, 1.5);
+    const roofGeometry = new THREE.BoxGeometry(1, 0.4, 1.5); // Dimensions of the roof
     const roofMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0xaa0000,
+        color: 0xaa0000, // Darker red for the roof
         shininess: 200,
         specular: 0xaaaaaa
     });
     const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-    roof.position.y = 0.7;
-    roof.position.z = -0.2;
+    roof.position.y = 0.7; // Position on top of the body
+    roof.position.z = -0.2; // Slightly offset to the back
     roof.castShadow = true;
     roof.receiveShadow = true;
     playerCar.add(roof);
     
     // Enhanced wheels with rims
-    const wheelGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.25, 12);
+    const wheelGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.25, 12); // Radius, height, segments for tire
     const wheelMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0x111111,
+        color: 0x111111, // Dark grey for tires
         shininess: 50
     });
     
-    const rimGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.3, 12);
+    const rimGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.3, 12); // Slightly smaller radius for rim
     const rimMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0x888888,
+        color: 0x888888, // Silver color for rims
         shininess: 200,
         specular: 0xffffff
     });
     
-    const wheels = [
-        { x: -0.7, z: 0.8 },
-        { x: 0.7, z: 0.8 },
-        { x: -0.7, z: -0.8 },
-        { x: 0.7, z: -0.8 }
+    const wheels = [ // Positions for the four wheels
+        { x: -0.7, z: 0.8 }, // Front left
+        { x: 0.7, z: 0.8 },  // Front right
+        { x: -0.7, z: -0.8 },// Rear left
+        { x: 0.7, z: -0.8 } // Rear right
     ];
     
     wheels.forEach(pos => {
-        const wheelGroup = new THREE.Group();
+        const wheelGroup = new THREE.Group(); // Group for tire and rim
         
         const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-        wheel.rotation.z = Math.PI / 2;
+        wheel.rotation.z = Math.PI / 2; // Rotate to align with car orientation
         wheel.castShadow = true;
         wheelGroup.add(wheel);
         
         const rim = new THREE.Mesh(rimGeometry, rimMaterial);
-        rim.rotation.z = Math.PI / 2;
+        rim.rotation.z = Math.PI / 2; // Align rim
         rim.castShadow = true;
         wheelGroup.add(rim);
         
-        wheelGroup.position.set(pos.x, 0.3, pos.z);
+        wheelGroup.position.set(pos.x, 0.3, pos.z); // Set wheel position relative to car body
         playerCar.add(wheelGroup);
     });
     
     // Enhanced headlights with lens effect
-    const headlightGeometry = new THREE.SphereGeometry(0.12, 12, 12);
+    const headlightGeometry = new THREE.SphereGeometry(0.12, 12, 12); // Small spheres for headlights
     const headlightMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffcc,
+        color: 0xffffcc, // Pale yellow for headlight glow
         transparent: true,
         opacity: 0.9
     });
     
     const leftHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
-    leftHeadlight.position.set(-0.4, 0.4, 1.3);
+    leftHeadlight.position.set(-0.4, 0.4, 1.3); // Position on the front of the car
     playerCar.add(leftHeadlight);
     
     const rightHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
@@ -436,13 +474,13 @@ function createPlayerCar() {
     playerCar.add(rightHeadlight);
     
     // Taillights
-    const taillightGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+    const taillightGeometry = new THREE.SphereGeometry(0.08, 8, 8); // Smaller spheres for taillights
     const taillightMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xff0000
+        color: 0xff0000 // Red for taillights
     });
     
     const leftTaillight = new THREE.Mesh(taillightGeometry, taillightMaterial);
-    leftTaillight.position.set(-0.4, 0.3, -1.2);
+    leftTaillight.position.set(-0.4, 0.3, -1.2); // Position on the rear of the car
     playerCar.add(leftTaillight);
     
     const rightTaillight = new THREE.Mesh(taillightGeometry, taillightMaterial);
@@ -450,33 +488,34 @@ function createPlayerCar() {
     playerCar.add(rightTaillight);
     
     // Car details - grille
-    const grilleGeometry = new THREE.BoxGeometry(0.8, 0.2, 0.05);
+    const grilleGeometry = new THREE.BoxGeometry(0.8, 0.2, 0.05); // Thin box for the grille
     const grilleMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0x333333,
+        color: 0x333333, // Dark grey for grille
         shininess: 100
     });
     const grille = new THREE.Mesh(grilleGeometry, grilleMaterial);
-    grille.position.set(0, 0.3, 1.25);
+    grille.position.set(0, 0.3, 1.25); // Position at the front of the car body
     playerCar.add(grille);
     
-    playerCar.position.set(0, 0.1, 2);
-    scene.add(playerCar);
+    playerCar.position.set(0, 0.1, 2); // Initial position of the player car in the scene
+    playerCar.userData.boundingBox = new THREE.Box3(); // Initialize bounding box for collision detection
+    scene.add(playerCar); // Add the car to the scene
 }
 
 // Create enemy car
 function createEnemyCar(x, z) {
-    const enemyCar = new THREE.Group();
+    const enemyCar = new THREE.Group(); // Main group for the enemy car
     
-    // Enhanced car body with metallic finish
+    // Enhanced car body with metallic finish - similar structure to player car but with varied colors
     const bodyGeometry = new THREE.BoxGeometry(1.2, 0.5, 2.5);
-    const colors = [
-        { main: 0x2244ff, spec: 0x4466ff },
-        { main: 0x22ff44, spec: 0x44ff66 },
-        { main: 0xffff22, spec: 0xffff44 },
-        { main: 0xff22ff, spec: 0xff44ff },
-        { main: 0x22ffff, spec: 0x44ffff }
+    const colors = [ // Array of color schemes for variety
+        { main: 0x2244ff, spec: 0x4466ff }, // Blue
+        { main: 0x22ff44, spec: 0x44ff66 }, // Green
+        { main: 0xffff22, spec: 0xffff44 }, // Yellow
+        { main: 0xff22ff, spec: 0xff44ff }, // Magenta
+        { main: 0x22ffff, spec: 0x44ffff }  // Cyan
     ];
-    const colorSet = colors[Math.floor(Math.random() * colors.length)];
+    const colorSet = colors[Math.floor(Math.random() * colors.length)]; // Randomly select a color scheme
     
     const bodyMaterial = new THREE.MeshPhongMaterial({ 
         color: colorSet.main,
@@ -493,7 +532,7 @@ function createEnemyCar(x, z) {
     // Car roof
     const roofGeometry = new THREE.BoxGeometry(1, 0.4, 1.5);
     const roofMaterial = new THREE.MeshPhongMaterial({ 
-        color: new THREE.Color(colorSet.main).multiplyScalar(0.7),
+        color: new THREE.Color(colorSet.main).multiplyScalar(0.7), // Darker shade of the main color
         shininess: 150,
         specular: 0x666666
     });
@@ -504,7 +543,7 @@ function createEnemyCar(x, z) {
     roof.receiveShadow = true;
     enemyCar.add(roof);
     
-    // Enhanced wheels
+    // Enhanced wheels - same geometry and material as player car wheels for consistency
     const wheelGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.25, 12);
     const wheelMaterial = new THREE.MeshPhongMaterial({ 
         color: 0x111111,
@@ -517,16 +556,13 @@ function createEnemyCar(x, z) {
         shininess: 150
     });
     
-    const wheels = [
-        { x: -0.7, z: 0.8 },
-        { x: 0.7, z: 0.8 },
-        { x: -0.7, z: -0.8 },
-        { x: 0.7, z: -0.8 }
+    const wheels = [ // Wheel positions
+        { x: -0.7, z: 0.8 }, { x: 0.7, z: 0.8 },
+        { x: -0.7, z: -0.8 }, { x: 0.7, z: -0.8 }
     ];
     
     wheels.forEach(pos => {
         const wheelGroup = new THREE.Group();
-        
         const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
         wheel.rotation.z = Math.PI / 2;
         wheel.castShadow = true;
@@ -541,10 +577,10 @@ function createEnemyCar(x, z) {
         enemyCar.add(wheelGroup);
     });
     
-    // Headlights
+    // Headlights - simpler than player car's, non-emissive
     const headlightGeometry = new THREE.SphereGeometry(0.1, 10, 10);
     const headlightMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffcc
+        color: 0xffffcc // Pale yellow
     });
     
     const leftHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
@@ -558,7 +594,7 @@ function createEnemyCar(x, z) {
     // Taillights
     const taillightGeometry = new THREE.SphereGeometry(0.08, 8, 8);
     const taillightMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xff0000
+        color: 0xff0000 // Red
     });
     
     const leftTaillight = new THREE.Mesh(taillightGeometry, taillightMaterial);
@@ -569,22 +605,25 @@ function createEnemyCar(x, z) {
     rightTaillight.position.set(0.4, 0.3, -1.2);
     enemyCar.add(rightTaillight);
     
-    enemyCar.position.set(x, 0.1, z);
-    enemyCar.userData = { speed: gameSpeed + Math.random() * 0.02 };
+    enemyCar.position.set(x, 0.1, z); // Set initial position based on arguments
+    enemyCar.userData = { 
+        speed: gameSpeed + Math.random() * 0.02, // Assign a slightly randomized speed
+        boundingBox: new THREE.Box3() // Initialize bounding box
+    };
     
-    scene.add(enemyCar);
-    return enemyCar;
+    scene.add(enemyCar); // Add to scene
+    return enemyCar; // Return the created car object
 }
 
 // Create power-up
 function createPowerUp(x, z) {
-    const powerUp = new THREE.Group();
+    const powerUp = new THREE.Group(); // Main group for the power-up
     
     // Enhanced main sphere with crystal-like appearance
-    const geometry = new THREE.SphereGeometry(0.35, 16, 16);
+    const geometry = new THREE.SphereGeometry(0.35, 16, 16); // Main visible part of the power-up
     const material = new THREE.MeshPhongMaterial({ 
-        color: 0xffd700,
-        emissive: 0xffd700,
+        color: 0xffd700, // Gold color
+        emissive: 0xffd700, // Emissive to make it glow
         emissiveIntensity: 0.4,
         shininess: 200,
         specular: 0xffffff,
@@ -592,23 +631,23 @@ function createPowerUp(x, z) {
         opacity: 0.9
     });
     const sphere = new THREE.Mesh(geometry, material);
-    sphere.castShadow = true;
+    sphere.castShadow = true; // Power-ups can cast shadows
     powerUp.add(sphere);
     
-    // Inner glow sphere
+    // Inner glow sphere for added visual effect
     const innerGeometry = new THREE.SphereGeometry(0.25, 12, 12);
     const innerMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffff88,
+        color: 0xffff88, // Lighter yellow for inner glow
         transparent: true,
         opacity: 0.6
     });
     const innerSphere = new THREE.Mesh(innerGeometry, innerMaterial);
     powerUp.add(innerSphere);
     
-    // Enhanced rotating rings
-    const ringGeometry = new THREE.TorusGeometry(0.45, 0.08, 8, 20);
+    // Enhanced rotating rings around the power-up
+    const ringGeometry = new THREE.TorusGeometry(0.45, 0.08, 8, 20); // Radius, tube diameter, segments
     const ringMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0xffffff,
+        color: 0xffffff, // White rings
         emissive: 0xffffff,
         emissiveIntensity: 0.3,
         transparent: true,
@@ -616,84 +655,128 @@ function createPowerUp(x, z) {
         shininess: 150
     });
     const ring1 = new THREE.Mesh(ringGeometry, ringMaterial);
-    ring1.rotation.x = Math.PI / 2;
+    ring1.rotation.x = Math.PI / 2; // Rotate one ring horizontally
     powerUp.add(ring1);
     
     const ring2 = new THREE.Mesh(ringGeometry, ringMaterial);
-    ring2.rotation.z = Math.PI / 2;
+    ring2.rotation.z = Math.PI / 2; // Rotate the other ring vertically (or along another axis)
     powerUp.add(ring2);
     
-    // Particle effects
-    const particleGeometry = new THREE.SphereGeometry(0.05, 6, 6);
+    // Particle effects orbiting the power-up
+    const particleGeometry = new THREE.SphereGeometry(0.05, 6, 6); // Small spheres for particles
     const particleMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffff00,
+        color: 0xffff00, // Yellow particles
         transparent: true,
         opacity: 0.7
     });
     
-    const particles = [];
+    const particles = []; // Store particles for animation
     for (let i = 0; i < 6; i++) {
         const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-        const angle = (i / 6) * Math.PI * 2;
+        const angle = (i / 6) * Math.PI * 2; // Distribute particles in a circle
         particle.position.set(
-            Math.cos(angle) * 0.8,
-            Math.sin(angle * 2) * 0.3,
+            Math.cos(angle) * 0.8, // Orbit radius
+            Math.sin(angle * 2) * 0.3, // Add some vertical variation
             Math.sin(angle) * 0.8
         );
         particles.push(particle);
         powerUp.add(particle);
     }
     
-    powerUp.position.set(x, 0.6, z);
+    powerUp.position.set(x, 0.6, z); // Set initial position, raised slightly
     powerUp.userData = { 
-        speed: gameSpeed,
-        rotationSpeed: 0.08,
-        rings: [ring1, ring2],
-        particles: particles,
-        innerSphere: innerSphere,
-        time: 0
+        speed: gameSpeed, // Power-up moves with the game speed initially
+        rotationSpeed: 0.08, // How fast the power-up itself rotates
+        rings: [ring1, ring2], // References to rings for animation
+        particles: particles, // References to particles for animation
+        innerSphere: innerSphere, // Reference to inner sphere for animation
+        time: 0, // Time counter for animation patterns
+        boundingBox: new THREE.Box3() // Initialize bounding box
     };
     
-    scene.add(powerUp);
-    return powerUp;
+    scene.add(powerUp); // Add to scene
+    return powerUp; // Return the created power-up object
 }
 
-// Create environment
+// Helper function to dispose of THREE.js objects
+function disposeObject(object) {
+    if (!object) return;
+
+    // If the object is a THREE.Group, iterate through children
+    if (object.isGroup) {
+        object.traverse(child => {
+            if (child.isMesh) {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => {
+                            if (m.map) m.map.dispose();
+                            m.dispose();
+                        });
+                    } else {
+                        if (child.material.map) child.material.map.dispose();
+                        child.material.dispose();
+                    }
+                }
+            }
+        });
+    } else if (object.isMesh) {
+        if (object.geometry) object.geometry.dispose();
+        if (object.material) {
+            if (Array.isArray(object.material)) {
+                object.material.forEach(m => {
+                    if (m.map) m.map.dispose();
+                    m.dispose();
+                });
+            } else {
+                if (object.material.map) object.material.map.dispose();
+                object.material.dispose();
+            }
+        }
+    }
+    // For other object types like lights, if they have dispose methods
+    if (object.dispose && typeof object.dispose === 'function') {
+        object.dispose();
+    }
+}
+
+// Create environment elements (sky, ground, trees, buildings, etc.)
 function createEnvironment() {
     // Enhanced night sky with stars
-    const skyGeometry = new THREE.SphereGeometry(300, 32, 32);
+    const skyGeometry = new THREE.SphereGeometry(300, 32, 32); // Large sphere for the skybox
     const skyMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x000044,
-        side: THREE.BackSide
+        color: 0x000044, // Dark blue for night sky
+        side: THREE.BackSide // Render material on the inside of the sphere
     });
     const sky = new THREE.Mesh(skyGeometry, skyMaterial);
     scene.add(sky);
     
-    // Add stars
+    // Add stars to the sky
     createStars();
     
-    // Enhanced ground with texture-like appearance
-    const groundGeometry = new THREE.PlaneGeometry(100, ROAD_LENGTH * 3, 50, 50);
+    // Enhanced ground with texture-like appearance (noise displacement)
+    const groundGeometry = new THREE.PlaneGeometry(100, ROAD_LENGTH * 3, 50, 50); // Large plane for ground
     const groundMaterial = new THREE.MeshLambertMaterial({ 
-        color: 0x002200,
+        color: 0x002200, // Dark green for ground
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8 // Slightly transparent for a softer look
     });
     
-    // Add noise to ground for realistic terrain
-    const leftGround = new THREE.Mesh(groundGeometry, groundMaterial);
+    // Add noise to ground for realistic terrain on the left side of the road
+    const leftGround = new THREE.Mesh(groundGeometry.clone(), groundMaterial); // Clone geometry to modify vertices independently
     const leftVertices = leftGround.geometry.attributes.position.array;
     for (let i = 0; i < leftVertices.length; i += 3) {
-        leftVertices[i + 2] += (Math.random() - 0.5) * 0.3;
+        leftVertices[i + 2] += (Math.random() - 0.5) * 0.3; // Random height variation
     }
     leftGround.geometry.attributes.position.needsUpdate = true;
     leftGround.geometry.computeVertexNormals();
-    leftGround.rotation.x = -Math.PI / 2;
-    leftGround.position.set(-50, -0.2, -ROAD_LENGTH);
-    leftGround.receiveShadow = true;
+    leftGround.rotation.x = -Math.PI / 2; // Lay flat
+    leftGround.position.set(-50, -0.2, -ROAD_LENGTH); // Position to the left of the road, slightly below
+    leftGround.receiveShadow = true; // Ground receives shadows
     scene.add(leftGround);
     
-    const rightGround = new THREE.Mesh(groundGeometry, groundMaterial);
+    // Add noise to ground for realistic terrain on the right side of the road
+    const rightGround = new THREE.Mesh(groundGeometry.clone(), groundMaterial);
     const rightVertices = rightGround.geometry.attributes.position.array;
     for (let i = 0; i < rightVertices.length; i += 3) {
         rightVertices[i + 2] += (Math.random() - 0.5) * 0.3;
@@ -701,122 +784,124 @@ function createEnvironment() {
     rightGround.geometry.attributes.position.needsUpdate = true;
     rightGround.geometry.computeVertexNormals();
     rightGround.rotation.x = -Math.PI / 2;
-    rightGround.position.set(50, -0.2, -ROAD_LENGTH);
+    rightGround.position.set(50, -0.2, -ROAD_LENGTH); // Position to the right of the road
     rightGround.receiveShadow = true;
     scene.add(rightGround);
     
-    // Enhanced trees and buildings
+    // Populate the environment with trees, buildings, and particle effects
     createTrees();
     createBuildings();
-    createParticleEffects();
+    createParticleEffects(); // Includes dust and heat shimmer
 }
 
-// Create particle effects for atmosphere
+// Create particle effects for atmosphere (dust, etc.)
 function createParticleEffects() {
-    // Create dust particles that move past the car
-    const dustGeometry = new THREE.SphereGeometry(0.02, 4, 4);
+    // Create dust particles that move past the car, adding to the sense of speed
+    const dustGeometry = new THREE.SphereGeometry(0.02, 4, 4); // Very small particles
     const dustMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x888888,
+        color: 0x888888, // Greyish color for dust
         transparent: true,
-        opacity: 0.3
+        opacity: 0.3 // Low opacity
     });
     
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 50; i++) { // Create a number of dust particles
         const dust = new THREE.Mesh(dustGeometry, dustMaterial);
         dust.position.set(
-            (Math.random() - 0.5) * 50,
-            Math.random() * 5,
-            (Math.random() - 0.5) * ROAD_LENGTH * 2
+            (Math.random() - 0.5) * 50, // Spread randomly across a wide area
+            Math.random() * 5,          // Random height
+            (Math.random() - 0.5) * ROAD_LENGTH * 2 // Spread along the road length
         );
         
-        dust.userData = {
+        dust.userData = { // Store data for animation
             originalZ: dust.position.z,
-            speed: Math.random() * 0.5 + 0.5,
-            drift: (Math.random() - 0.5) * 0.01
+            speed: Math.random() * 0.5 + 0.5, // Individual speed variation
+            drift: (Math.random() - 0.5) * 0.01 // Slight sideways drift
         };
         
-        environmentObjects.particles = environmentObjects.particles || [];
+        environmentObjects.particles = environmentObjects.particles || []; // Initialize if not present
         environmentObjects.particles.push(dust);
         scene.add(dust);
     }
     
-    // Add road heat shimmer effect
+    // Add road heat shimmer effect for more realism, especially at high speeds
     createHeatShimmer();
 }
 
-// Create heat shimmer effect on road
+// Create heat shimmer effect on road surface
 function createHeatShimmer() {
-    const shimmerGeometry = new THREE.PlaneGeometry(ROAD_WIDTH * 0.8, 20, 16, 16);
+    const shimmerGeometry = new THREE.PlaneGeometry(ROAD_WIDTH * 0.8, 20, 16, 16); // Plane above the road
     const shimmerMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffff,
+        color: 0xffffff, // White, but opacity will make it subtle
         transparent: true,
-        opacity: 0.05,
-        side: THREE.DoubleSide
+        opacity: 0.05, // Very low opacity for a faint effect
+        side: THREE.DoubleSide // Visible from both sides
     });
     
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 5; i++) { // Create a few shimmer planes
         const shimmer = new THREE.Mesh(shimmerGeometry, shimmerMaterial);
-        shimmer.rotation.x = -Math.PI / 2;
-        shimmer.position.set(0, 0.05, -40 + i * 20);
+        shimmer.rotation.x = -Math.PI / 2; // Lay flat over the road
+        shimmer.position.set(0, 0.05, -40 + i * 20); // Position slightly above road, spaced out
         
-        // Add wave animation to vertices
+        // Add wave animation to vertices to simulate heat distortion
         const vertices = shimmer.geometry.attributes.position.array;
         for (let j = 0; j < vertices.length; j += 3) {
-            vertices[j + 2] += Math.sin(j * 0.1) * 0.02;
+            vertices[j + 2] += Math.sin(j * 0.1) * 0.02; // Apply a sine wave to Z positions (relative to plane)
         }
         shimmer.geometry.attributes.position.needsUpdate = true;
         
-        shimmer.userData = {
+        shimmer.userData = { // Store data for animation
             originalZ: shimmer.position.z,
-            waveTime: Math.random() * Math.PI * 2
+            waveTime: Math.random() * Math.PI * 2 // Random start time for wave animation
         };
         
-        environmentObjects.shimmer = environmentObjects.shimmer || [];
+        environmentObjects.shimmer = environmentObjects.shimmer || []; // Initialize if not present
         environmentObjects.shimmer.push(shimmer);
         scene.add(shimmer);
     }
 }
 
-// Create stars
+// Create stars in the sky
 function createStars() {
-    const starGeometry = new THREE.SphereGeometry(0.5, 6, 6);
+    const starGeometry = new THREE.SphereGeometry(0.5, 6, 6); // Small spheres for stars
     const starMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffff
+        color: 0xffffff // White stars
     });
     
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 200; i++) { // Create many stars
         const star = new THREE.Mesh(starGeometry, starMaterial);
-        const radius = 250 + Math.random() * 50;
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.random() * Math.PI;
+        const radius = 250 + Math.random() * 50; // Distance from origin (center of sky sphere)
+        const theta = Math.random() * Math.PI * 2; // Angle for spherical distribution (longitude)
+        const phi = Math.random() * Math.PI;       // Angle for spherical distribution (latitude)
         
+        // Convert spherical coordinates to Cartesian for positioning
         star.position.set(
             radius * Math.sin(phi) * Math.cos(theta),
             radius * Math.cos(phi),
             radius * Math.sin(phi) * Math.sin(theta)
         );
         
-        star.scale.setScalar(Math.random() * 0.5 + 0.5);
+        star.scale.setScalar(Math.random() * 0.5 + 0.5); // Randomize star size slightly
         star.userData = { 
-            originalPosition: star.position.clone(),
-            twinkleSpeed: Math.random() * 0.02 + 0.01
+            originalPosition: star.position.clone(), // Store for parallax effect
+            twinkleSpeed: Math.random() * 0.02 + 0.01 // Speed of twinkling effect
         };
         environmentObjects.stars.push(star);
         scene.add(star);
     }
 }
 
-// Create buildings
+// Create buildings alongside the road
 function createBuildings() {
-    const buildingMaterials = [
-        new THREE.MeshPhongMaterial({ color: 0x444444, shininess: 50 }),
-        new THREE.MeshPhongMaterial({ color: 0x333366, shininess: 30 }),
-        new THREE.MeshPhongMaterial({ color: 0x663333, shininess: 40 })
+    const buildingMaterials = [ // Array of materials for building variety
+        new THREE.MeshPhongMaterial({ color: 0x444444, shininess: 50 }), // Dark grey
+        new THREE.MeshPhongMaterial({ color: 0x333366, shininess: 30 }), // Dark blue
+        new THREE.MeshPhongMaterial({ color: 0x663333, shininess: 40 })  // Dark red/brown
     ];
     
-    for (let i = 0; i < 30; i++) {
-        const building = new THREE.Group();
+    for (let i = 0; i < 30; i++) { // Create a number of buildings
+        const building = new THREE.Group(); // Group for building and its windows
         
+        // Randomize building dimensions
         const height = 8 + Math.random() * 20;
         const width = 3 + Math.random() * 4;
         const depth = 3 + Math.random() * 4;
@@ -824,147 +909,165 @@ function createBuildings() {
         const buildingGeometry = new THREE.BoxGeometry(width, height, depth);
         const buildingMaterial = buildingMaterials[Math.floor(Math.random() * buildingMaterials.length)];
         const buildingMesh = new THREE.Mesh(buildingGeometry, buildingMaterial);
-        buildingMesh.position.y = height / 2;
+        buildingMesh.position.y = height / 2; // Position base at ground level
         buildingMesh.castShadow = true;
         buildingMesh.receiveShadow = true;
         building.add(buildingMesh);
         
-        // Add windows
-        const windowGeometry = new THREE.PlaneGeometry(0.8, 1.2);
+        // Add windows to the front face of the building
+        const windowGeometry = new THREE.PlaneGeometry(0.8, 1.2); // Dimensions of a window
         const windowMaterial = new THREE.MeshBasicMaterial({ 
-            color: Math.random() > 0.7 ? 0xffff88 : 0x222222
+            color: Math.random() > 0.7 ? 0xffff88 : 0x222222 // Randomly lit (yellow) or dark windows
         });
         
-        for (let j = 0; j < Math.floor(height / 3); j++) {
-            for (let k = 0; k < Math.floor(width / 2); k++) {
+        // Create a grid of windows
+        for (let j = 0; j < Math.floor(height / 3); j++) { // Rows of windows
+            for (let k = 0; k < Math.floor(width / 2); k++) { // Columns of windows
                 const window = new THREE.Mesh(windowGeometry, windowMaterial);
                 window.position.set(
-                    -width/2 + 1 + k * 1.5,
-                    j * 3 + 2,
-                    depth/2 + 0.01
+                    -width/2 + 1 + k * 1.5, // Position across the building face
+                    j * 3 + 2,              // Position up the building face
+                    depth/2 + 0.01          // Slightly in front of the building face
                 );
                 building.add(window);
             }
         }
         
-        const side = Math.random() > 0.5 ? 1 : -1;
-        const zPosition = (Math.random() - 0.5) * ROAD_LENGTH * 2;
+        // Position building randomly to the left or right of the road, and along its length
+        const side = Math.random() > 0.5 ? 1 : -1; // -1 for left, 1 for right
+        const zPosition = (Math.random() - 0.5) * ROAD_LENGTH * 2; // Random z position
         building.position.set(
-            side * (15 + Math.random() * 25),
-            0,
+            side * (15 + Math.random() * 25), // Random x offset from road
+            0,                                // Base at ground level
             zPosition
         );
         
-        building.userData = { originalZ: zPosition };
+        building.userData = { originalZ: zPosition }; // Store for repositioning
         environmentObjects.buildings.push(building);
         scene.add(building);
     }
 }
 
-// Create trees
+// Create trees alongside the road
 function createTrees() {
-    const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 4, 12);
+    // Materials for tree trunk and leaves
+    const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 4, 12); // Tapered cylinder for trunk
     const trunkMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0x8B4513,
+        color: 0x8B4513, // Brown color for trunk
         shininess: 10
     });
     
-    const leavesGeometry = new THREE.SphereGeometry(2, 12, 12);
-    const leavesMaterials = [
-        new THREE.MeshLambertMaterial({ color: 0x228B22 }),
-        new THREE.MeshLambertMaterial({ color: 0x32CD32 }),
-        new THREE.MeshLambertMaterial({ color: 0x006400 })
+    const leavesGeometry = new THREE.SphereGeometry(2, 12, 12); // Sphere for leaves canopy
+    const leavesMaterials = [ // Array of green materials for variety
+        new THREE.MeshLambertMaterial({ color: 0x228B22 }), // Forest green
+        new THREE.MeshLambertMaterial({ color: 0x32CD32 }), // Lime green
+        new THREE.MeshLambertMaterial({ color: 0x006400 })  // Dark green
     ];
     
-    for (let i = 0; i < 50; i++) {
-        const tree = new THREE.Group();
+    for (let i = 0; i < 50; i++) { // Create a number of trees
+        const tree = new THREE.Group(); // Group for trunk and leaves
         
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-        trunk.position.y = 2;
+        trunk.position.y = 2; // Position base of trunk at ground level
         trunk.castShadow = true;
         trunk.receiveShadow = true;
         tree.add(trunk);
         
         const leavesMaterial = leavesMaterials[Math.floor(Math.random() * leavesMaterials.length)];
         const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-        leaves.position.y = 4.5;
+        leaves.position.y = 4.5; // Position leaves on top of the trunk
         leaves.castShadow = true;
         leaves.receiveShadow = true;
         tree.add(leaves);
         
-        // Add some variation to tree shapes
+        // Add some variation to tree shapes by scaling the leaves canopy
         leaves.scale.set(
-            0.8 + Math.random() * 0.4,
-            0.8 + Math.random() * 0.4,
-            0.8 + Math.random() * 0.4
+            0.8 + Math.random() * 0.4, // Random width
+            0.8 + Math.random() * 0.4, // Random height
+            0.8 + Math.random() * 0.4  // Random depth
         );
         
+        // Position tree randomly to the left or right of the road, and along its length
         const side = Math.random() > 0.5 ? 1 : -1;
         const zPosition = (Math.random() - 0.5) * ROAD_LENGTH * 2;
         tree.position.set(
-            side * (12 + Math.random() * 20),
+            side * (12 + Math.random() * 20), // Random x offset from road
             0,
             zPosition
         );
         
-        tree.userData = { 
+        tree.userData = { // Store data for animation and repositioning
             originalZ: zPosition,
-            swaySpeed: Math.random() * 0.008 + 0.004,
-            swayAmount: Math.random() * 0.05 + 0.02
+            swaySpeed: Math.random() * 0.008 + 0.004, // Speed of swaying animation
+            swayAmount: Math.random() * 0.05 + 0.02   // Amount of sway
         };
         environmentObjects.trees.push(tree);
         scene.add(tree);
     }
 }
 
-// Initialize game
+// Initialize game state and objects
 function initGame() {
-    gameRunning = false;
-    gameSpeed = 0.04;
-    score = 0;
-    lives = 3;
+    gameRunning = false; // Stop the game loop if it's running
+    gameSpeed = 0.04;    // Reset game speed
+    score = 0;           // Reset score
+    lives = 3;           // Reset lives
+
+    // Clear dynamic game objects from the scene and dispose of them
+    enemyCars.forEach(car => {
+        disposeObject(car);
+        if (scene) scene.remove(car); // Check if scene exists
+    });
+    powerUps.forEach(powerUp => {
+        disposeObject(powerUp);
+        if (scene) scene.remove(powerUp);
+    });
+    explosions.forEach(explosion => {
+        disposeObject(explosion);
+        if (scene) scene.remove(explosion);
+    });
     
-    // Clear arrays
-    enemyCars.forEach(car => scene.remove(car));
-    powerUps.forEach(powerUp => scene.remove(powerUp));
-    explosions.forEach(explosion => scene.remove(explosion));
-    
+    // Reset arrays
     enemyCars = [];
     powerUps = [];
     explosions = [];
     
-    // Reset player position
+    // Reset player car position and rotation (if it exists)
     if (playerCar) {
-        playerCar.position.x = 0;
+        playerCar.position.set(0, 0.1, 2); // Reset to initial position
+        playerCar.rotation.set(0, 0, 0);   // Reset rotation
+        if (playerCar.userData.boundingBox) { 
+            playerCar.userData.boundingBox.setFromObject(playerCar);
+        }
     }
     
-    // Reset environment positions
+    // Reset positions of environment elements
     resetEnvironmentPositions();
     
+    // Update UI elements
     updateUI();
 }
 
-// Reset environment positions
+// Reset environment positions to their initial state
 function resetEnvironmentPositions() {
-    environmentObjects.trees.forEach(tree => {
-        tree.position.z = tree.userData.originalZ;
-    });
-    
-    environmentObjects.buildings.forEach(building => {
-        building.position.z = building.userData.originalZ;
-    });
-    
-    environmentObjects.streetLights.forEach(light => {
-        light.position.z = light.userData.originalZ;
-    });
-    
-    if (environmentObjects.particles) {
-        environmentObjects.particles.forEach(particle => {
-            particle.position.z = particle.userData.originalZ;
-        });
+    // Iterate over each type of environment object and reset its Z position
+    for (const key in environmentObjects) {
+        if (Array.isArray(environmentObjects[key])) {
+            environmentObjects[key].forEach(obj => {
+                if (obj.userData && typeof obj.userData.originalZ === 'number') {
+                    obj.position.z = obj.userData.originalZ;
+                }
+                // For objects that might have an X drift (like particles)
+                if (obj.userData && typeof obj.userData.originalX === 'number') {
+                    obj.position.x = obj.userData.originalX;
+                } else if (key === 'particles' && obj.userData) { 
+                     obj.position.x = (Math.random() - 0.5) * 50; // Specific reset for particles
+                }
+            });
+        }
     }
     
-    // Reset camera position
+    // Reset camera to its initial position and orientation
     if (camera) {
         camera.position.set(0, 4, 6);
         camera.lookAt(0, 0, -10);
@@ -973,46 +1076,76 @@ function resetEnvironmentPositions() {
 
 // Start game
 function startGame() {
-    if (!scene) {
+    if (!scene) { // Ensure scene is initialized only once, typically on first start
         init3D();
     }
     
-    initGame();
-    gameRunning = true;
-    startScreen.style.display = 'none';
-    gameOverScreen.style.display = 'none';
-    gameLoop();
+    initGame(); // Initialize or reset all game variables and objects
+    gameRunning = true; // Set game state to running
+    if(startScreen) startScreen.style.display = 'none'; // Hide start screen
+    if(gameOverScreen) gameOverScreen.style.display = 'none'; // Ensure game over screen is hidden
+    
+    // Start the main game animation loop, ensuring it's not already running
+    // and that requestAnimationFrame is available.
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(gameLoop);
+    }
 }
 
-// Game loop
+// Game loop - the core of the game's real-time updates
 function gameLoop() {
-    if (!gameRunning) return;
+    if (!gameRunning) return; // Exit if the game is not in a running state
+
+    try {
+        // Update game elements
+        if(playerCar) updatePlayer(); // Handle player input and movement, check playerCar exists
+    updateEnemies();      // Move and manage enemy cars
+    updatePowerUps();     // Move and manage power-ups
+    updateExplosions();   // Animate and manage explosions
+    updateRoad();         // Animate road markings
+    updateEnvironment();  // Move environment elements for scrolling effect
+    updateLighting();     // Update dynamic lights (e.g., player headlights)
     
-    updatePlayer();
-    updateEnemies();
-    updatePowerUps();
-    updateExplosions();
-    updateRoad();
-    updateEnvironment();
-    updateLighting();
-    spawnEnemies();
-    spawnPowerUps();
-    checkCollisions();
-    updateScore();
-    updateUI();
+    // Spawn new game elements
+    spawnEnemies();       // Randomly spawn new enemy cars
+    spawnPowerUps();      // Randomly spawn new power-ups
     
-    // Increase difficulty
-    if (score > 0 && score % 1500 === 0) {
-        gameSpeed = Math.min(gameSpeed + 0.008, MAX_SPEED);
+    // Game logic
+    if(playerCar) checkCollisions(); // Detect collisions, check playerCar exists
+    updateScore();        // Increment score based on game speed/time
+    
+    // Update UI
+    updateUI();           // Refresh on-screen display of score, lives, speed
+    
+    // Increase difficulty over time by gradually increasing game speed
+    // Check score > 0 to avoid increasing speed at the very beginning if score starts at 0.
+    if (score > 0 && score % 1500 === 0 && gameSpeed < MAX_SPEED) { 
+        gameSpeed = Math.min(gameSpeed + 0.008, MAX_SPEED); 
     }
     
-    // Render scene
-    renderer.render(scene, camera);
+    // Render the 3D scene
+    if (renderer && scene && camera) { // Ensure essential THREE.js objects are initialized
+        renderer.render(scene, camera);
+    }
     
-    requestAnimationFrame(gameLoop);
+        // Request the next frame for smooth animation, only if game is still running
+        if (gameRunning && typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(gameLoop);
+        }
+    } catch (e) {
+        console.error("Error during game loop:", e);
+        // Display error to user via the global mechanism, or a more specific one
+        const errorDisplay = document.getElementById('criticalErrorDisplay');
+        if (errorDisplay) {
+            errorDisplay.textContent = "An error occurred during gameplay. Please try refreshing. Check console for details.";
+            errorDisplay.style.display = 'block';
+        }
+        gameRunning = false; // Stop the game to prevent further errors
+        // Optionally, re-throw if needed, but the global handler should catch it.
+    }
 }
 
-// Update environment movement
+// Update environment movement and looping
 function updateEnvironment() {
     const movementSpeed = gameSpeed * 8;
     
@@ -1052,13 +1185,19 @@ function updateEnvironment() {
     // Update particles
     if (environmentObjects.particles) {
         environmentObjects.particles.forEach(particle => {
+            if (!particle.userData) return; // Null check for particle.userData
             particle.position.z += movementSpeed * particle.userData.speed;
-            particle.position.x += particle.userData.drift;
+            particle.position.x += particle.userData.drift; // Apply drift
             
             // Reset particle position
-            if (particle.position.z > 15) {
-                particle.position.z = particle.userData.originalZ - ROAD_LENGTH * 2;
-                particle.position.x = (Math.random() - 0.5) * 50;
+            if (particle.position.z > 15) { // If particle moves past the camera
+                particle.position.z = (particle.userData.originalZ || 0) - ROAD_LENGTH * 2; // Reset Z
+                // Reset X to a new random position or original if available
+                particle.position.x = particle.userData.originalX !== undefined ? particle.userData.originalX : (Math.random() - 0.5) * 50;
+            }
+            // Keep particle within horizontal bounds if drifting
+            if (Math.abs(particle.position.x) > 50) {
+                if(particle.userData.drift) particle.userData.drift *= -1; // Reverse drift direction
             }
         });
     }
@@ -1139,6 +1278,9 @@ function updateLighting() {
 // Update player
 function updatePlayer() {
     if (!playerCar) return;
+
+    // Update player bounding box
+    playerCar.userData.boundingBox.setFromObject(playerCar);
     
     // Check for left movement (Arrow Left or A key)
     if ((keys['ArrowLeft'] || keys['KeyA']) && playerCar.position.x > -ROAD_WIDTH/2 + 1) {
@@ -1197,9 +1339,11 @@ function spawnEnemies() {
 function updateEnemies() {
     enemyCars.forEach((enemy, index) => {
         enemy.position.z += enemy.userData.speed * 5;
+        enemy.userData.boundingBox.setFromObject(enemy); // Update bounding box
         
         // Remove enemies that are behind the player
         if (enemy.position.z > 10) {
+            disposeObject(enemy); // Dispose of the enemy car
             scene.remove(enemy);
             enemyCars.splice(index, 1);
         }
@@ -1221,6 +1365,7 @@ function updatePowerUps() {
     powerUps.forEach((powerUp, index) => {
         powerUp.position.z += powerUp.userData.speed * 5;
         powerUp.rotation.y += powerUp.userData.rotationSpeed;
+        powerUp.userData.boundingBox.setFromObject(powerUp); // Update bounding box
         
         // Enhanced animations
         powerUp.userData.time += 0.05;
@@ -1249,6 +1394,7 @@ function updatePowerUps() {
         
         // Remove power-ups that are behind the player
         if (powerUp.position.z > 10) {
+            disposeObject(powerUp); // Dispose of the power-up
             scene.remove(powerUp);
             powerUps.splice(index, 1);
         }
@@ -1333,6 +1479,7 @@ function updateExplosions() {
         });
         
         if (explosion.userData.life <= 0) {
+            disposeObject(explosion); // Dispose of the explosion
             scene.remove(explosion);
             explosions.splice(index, 1);
         }
@@ -1341,16 +1488,18 @@ function updateExplosions() {
 
 // Check collisions
 function checkCollisions() {
-    if (!playerCar) return;
+    if (!playerCar || !playerCar.userData.boundingBox) return;
     
-    const playerBox = new THREE.Box3().setFromObject(playerCar);
+    const playerBox = playerCar.userData.boundingBox;
     
     // Check enemy collisions
     enemyCars.forEach((enemy, index) => {
-        const enemyBox = new THREE.Box3().setFromObject(enemy);
+        if (!enemy.userData.boundingBox) return;
+        const enemyBox = enemy.userData.boundingBox;
         
         if (playerBox.intersectsBox(enemyBox)) {
             createExplosion(enemy.position.x, enemy.position.y + 0.5, enemy.position.z);
+            disposeObject(enemy); // Dispose of the enemy car
             scene.remove(enemy);
             enemyCars.splice(index, 1);
             lives--;
@@ -1363,9 +1512,11 @@ function checkCollisions() {
     
     // Check power-up collisions
     powerUps.forEach((powerUp, index) => {
-        const powerUpBox = new THREE.Box3().setFromObject(powerUp);
+        if (!powerUp.userData.boundingBox) return;
+        const powerUpBox = powerUp.userData.boundingBox;
         
         if (playerBox.intersectsBox(powerUpBox)) {
+            disposeObject(powerUp); // Dispose of the power-up
             scene.remove(powerUp);
             powerUps.splice(index, 1);
             score += 200;
@@ -1394,62 +1545,28 @@ function updateUI() {
 
 // Game over
 function gameOver() {
-    gameRunning = false;
-    finalScoreElement.textContent = score;
-    gameOverScreen.style.display = 'block';
-    
-    // Clear all game objects
-    enemyCars.forEach(enemy => {
-        scene.remove(enemy);
-    });
-    powerUps.forEach(powerUp => {
-        scene.remove(powerUp);
-    });
-    explosions.forEach(explosion => {
-        scene.remove(explosion);
-    });
-    
-    enemyCars = [];
-    powerUps = [];
-    explosions = [];
+    gameRunning = false; // Stop the game loop
+    if(finalScoreElement) finalScoreElement.textContent = score; // Display final score
+    if(gameOverScreen) gameOverScreen.style.display = 'block'; // Show game over screen
+
+    // No need to clear objects here if restartGame calls initGame, which does the clearing.
+    // If a scenario exists where gameOver is called WITHOUT a subsequent restart, 
+    // then object clearing might be needed here. For this game's flow, it seems okay.
 }
 
 // Restart game
 function restartGame() {
-    // Hide game over screen
-    gameOverScreen.style.display = 'none';
+    if(gameOverScreen) gameOverScreen.style.display = 'none'; // Hide game over screen
     
-    // Reset all game variables
-    gameRunning = false;
-    gameSpeed = 0.04;
-    score = 0;
-    lives = 3;
+    // initGame handles resetting variables, clearing objects, and resetting positions.
+    initGame(); 
     
-    // Clear all game objects from scene
-    enemyCars.forEach(enemy => scene.remove(enemy));
-    powerUps.forEach(powerUp => scene.remove(powerUp));
-    explosions.forEach(explosion => scene.remove(explosion));
-    
-    // Reset arrays
-    enemyCars = [];
-    powerUps = [];
-    explosions = [];
-    
-    // Reset player car position and rotation
-    if (playerCar) {
-        playerCar.position.x = 0;
-        playerCar.rotation.z = 0;
-    }
-    
-    // Reset environment positions
-    resetEnvironmentPositions();
-    
-    // Update UI
-    updateUI();
-    
-    // Start the game
+    // Start the game again
     gameRunning = true;
-    gameLoop();
+    // Ensure game loop restarts if it had fully stopped or requestAnimationFrame is available
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(gameLoop);
+    }
 }
 
 // Event listeners
@@ -1531,15 +1648,34 @@ window.addEventListener('resize', () => {
 
 // Initialize when page loads
 window.addEventListener('load', () => {
-    // Show loading message
-    const loading = document.createElement('div');
-    loading.className = 'loading';
-    loading.textContent = 'Loading 3D Engine...';
-    gameArea.appendChild(loading);
+    // Show loading message or splash screen
+    const loadingElement = document.getElementById('loadingMessage') || document.createElement('div');
+    if (!loadingElement.id) { // If we just created it
+        loadingElement.id = 'loadingMessage';
+        loadingElement.className = 'loading'; // Assuming 'loading' class styles this
+        loadingElement.textContent = 'Loading 3D Engine... Please Wait...';
+        if(gameArea) gameArea.appendChild(loadingElement);
+    } else {
+        loadingElement.style.display = 'block'; // Ensure it's visible if it exists
+    }
     
-    // Initialize after a short delay to show loading
+    // Defer initialization of 3D scene and game until after loading message display
     setTimeout(() => {
-        loading.remove();
-        initGame();
-    }, 1000);
+        if (loadingElement) {
+            loadingElement.style.display = 'none'; // Hide loading message instead of removing, for potential reuse
+        }
+        // Game starts by showing the start screen.
+        // init3D() will be called by startGame() if scene is not yet created.
+        if(startScreen) startScreen.style.display = 'block'; // Show start screen
+        
+        // Pre-initialize essential parts if not already done by a specific game flow.
+        // This helps ensure that if a user tries to interact before "Start Game" is clicked,
+        // critical components like UI updaters don't fail.
+        if (!scene) { // If init3D hasn't run (e.g. direct jump to game w/o start screen)
+            // It's generally better to ensure startGame is the only entry point to init3D & initGame.
+            // For robustness, one might consider a minimal UI setup here.
+        }
+        updateUI(); // Initial UI update for score/lives if they are displayed before game start.
+
+    }, 1000); // Delay for loading message visibility
 });
