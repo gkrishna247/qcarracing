@@ -118,9 +118,7 @@ function createStreetLights() {
     
     const lightGeometry = new THREE.SphereGeometry(0.3, 8, 8);
     const lightMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffaa,
-        emissive: 0xffffaa,
-        emissiveIntensity: 0.3
+        color: 0xffffaa
     });
     
     for (let i = -ROAD_LENGTH; i < ROAD_LENGTH * 2; i += 15) {
@@ -226,9 +224,7 @@ function createRoadMarkings() {
     // Center lane divider - dashed lines
     const centerLineGeometry = new THREE.BoxGeometry(0.2, 0.04, 3);
     const centerLineMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffff,
-        emissive: 0xffffff,
-        emissiveIntensity: 0.25
+        color: 0xffffff
     });
     
     for (let i = -ROAD_LENGTH/2; i < ROAD_LENGTH/2; i += 5) {
@@ -252,9 +248,7 @@ function createRoadMarkings() {
     // Side lane markings - solid lines
     const sideLineGeometry = new THREE.BoxGeometry(0.25, 0.04, ROAD_LENGTH);
     const sideLineMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffff00,
-        emissive: 0xffff00,
-        emissiveIntensity: 0.2
+        color: 0xffff00
     });
     
     // Left side line
@@ -429,8 +423,6 @@ function createPlayerCar() {
     const headlightGeometry = new THREE.SphereGeometry(0.12, 12, 12);
     const headlightMaterial = new THREE.MeshBasicMaterial({ 
         color: 0xffffcc,
-        emissive: 0xffffcc,
-        emissiveIntensity: 0.8,
         transparent: true,
         opacity: 0.9
     });
@@ -446,9 +438,7 @@ function createPlayerCar() {
     // Taillights
     const taillightGeometry = new THREE.SphereGeometry(0.08, 8, 8);
     const taillightMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xff0000,
-        emissive: 0xff0000,
-        emissiveIntensity: 0.5
+        color: 0xff0000
     });
     
     const leftTaillight = new THREE.Mesh(taillightGeometry, taillightMaterial);
@@ -554,9 +544,7 @@ function createEnemyCar(x, z) {
     // Headlights
     const headlightGeometry = new THREE.SphereGeometry(0.1, 10, 10);
     const headlightMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffcc,
-        emissive: 0xffffcc,
-        emissiveIntensity: 0.6
+        color: 0xffffcc
     });
     
     const leftHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
@@ -570,9 +558,7 @@ function createEnemyCar(x, z) {
     // Taillights
     const taillightGeometry = new THREE.SphereGeometry(0.08, 8, 8);
     const taillightMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xff0000,
-        emissive: 0xff0000,
-        emissiveIntensity: 0.4
+        color: 0xff0000
     });
     
     const leftTaillight = new THREE.Mesh(taillightGeometry, taillightMaterial);
@@ -795,9 +781,7 @@ function createHeatShimmer() {
 function createStars() {
     const starGeometry = new THREE.SphereGeometry(0.5, 6, 6);
     const starMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffff,
-        emissive: 0xffffff,
-        emissiveIntensity: 0.8
+        color: 0xffffff
     });
     
     for (let i = 0; i < 200; i++) {
@@ -848,9 +832,7 @@ function createBuildings() {
         // Add windows
         const windowGeometry = new THREE.PlaneGeometry(0.8, 1.2);
         const windowMaterial = new THREE.MeshBasicMaterial({ 
-            color: Math.random() > 0.7 ? 0xffff88 : 0x222222,
-            emissive: Math.random() > 0.7 ? 0xffff88 : 0x000000,
-            emissiveIntensity: 0.3
+            color: Math.random() > 0.7 ? 0xffff88 : 0x222222
         });
         
         for (let j = 0; j < Math.floor(height / 3); j++) {
